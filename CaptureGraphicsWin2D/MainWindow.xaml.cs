@@ -39,9 +39,6 @@ namespace CaptureGraphicsWin2D
                 titleBar.InactiveBackgroundColor = darkBg;
                 titleBar.ButtonInactiveBackgroundColor = darkBg;
                 titleBar.ButtonInactiveForegroundColor = Microsoft.UI.Colors.Gray;
-
-                // Explicitly hide the icon and system menu from the title bar
-                titleBar.IconShowOptions = Microsoft.UI.Windowing.IconShowOptions.HideIconAndSystemMenu;
             }
 
             // Initialize with the expected size (at Scale Factor 1 so the size will increase on Scale Factor 2)
