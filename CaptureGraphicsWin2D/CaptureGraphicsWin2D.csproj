@@ -63,7 +63,7 @@
     <PackageIcon>icon.png</PackageIcon>
     <RepositoryUrl>https://github.com/rednoah/CaptureGraphicsWin2D</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <FileVersion>1.0.6.0</FileVersion>
+    <FileVersion>1.0.9.0</FileVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Optimize>True</Optimize>
