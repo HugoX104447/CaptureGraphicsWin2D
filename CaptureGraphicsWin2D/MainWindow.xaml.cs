@@ -496,7 +496,7 @@ namespace CaptureGraphicsWin2D
 
             IntPtr dirPidl = IntPtr.Zero;
             List<IntPtr> absoluteFilePidls = new List<IntPtr>();
-            IntPtr[] relativeFilePidls = new IntPtr[filePaths.Count];
+            List<IntPtr> relativeFilePidls = new List<IntPtr>();
             uint sfgao;
 
             try
@@ -513,12 +513,16 @@ namespace CaptureGraphicsWin2D
                     {
                         absoluteFilePidls.Add(absPidl);
                         // The API requires pointers relative to the parent folder, so we extract the last ID
-                        relativeFilePidls[i] = ILFindLastID(absPidl);
+                        relativeFilePidls.Add(ILFindLastID(absPidl));
                     }
                 }
 
                 // 3. Command Windows Explorer to open the folder and highlight the array of items
-                SHOpenFolderAndSelectItems(dirPidl, (uint)relativeFilePidls.Length, relativeFilePidls, 0);
+                // (only files that could be parsed, a null entry must never be passed to the API)
+                if (relativeFilePidls.Count > 0)
+                {
+                    SHOpenFolderAndSelectItems(dirPidl, (uint)relativeFilePidls.Count, relativeFilePidls.ToArray(), 0);
+                }
             }
             catch
             {
