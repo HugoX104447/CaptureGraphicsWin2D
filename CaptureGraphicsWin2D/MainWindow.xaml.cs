@@ -339,7 +339,7 @@ namespace CaptureGraphicsWin2D
         private async Task CaptureWindowAlphaAsync(IntPtr hwnd, string outputPath)
         {
             GraphicsCaptureItem item = CreateItemForWindow(hwnd);
-            CanvasDevice device = new CanvasDevice();
+            using CanvasDevice device = new CanvasDevice();
 
             if (item.Size.Width <= 32 || item.Size.Height <= 32)
             {
@@ -366,7 +366,6 @@ namespace CaptureGraphicsWin2D
 
             if (completedTask == timeoutTask)
             {
-                session.Dispose();
                 throw new Exception("Capture timed out.");
             }
 
@@ -402,8 +401,6 @@ namespace CaptureGraphicsWin2D
             }
 
             await renderTarget.SaveAsync(outputPath, CanvasBitmapFileFormat.Png);
-
-            session.Dispose();
         }
 
         // --- WIN32 INTEROP ---
