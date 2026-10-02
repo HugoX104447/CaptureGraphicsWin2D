@@ -76,6 +76,10 @@ namespace UWPCaptureGraphicsWin2D
             {
                 AttachConsole(ATTACH_PARENT_PROCESS);
 
+                // --no-overwrite - keep existing files and generate unique file names
+                bool overwrite = !args.Skip(1).Any(IsNoOverwriteFlag);
+                args = [.. args.Take(1), .. args.Skip(1).Where(a => !IsNoOverwriteFlag(a))];
+
                 List<string> targetWindow = new List<string> { SELECT_ALL_WINDOWS };
                 string outputDir = GetDefaultFolder();
 
@@ -93,7 +97,7 @@ namespace UWPCaptureGraphicsWin2D
 
                 foreach (var win in targetWindow)
                 {
-                    var capturedFiles = await CaptureAllVisibleWindowsAsync(win, outputDir);
+                    var capturedFiles = await CaptureAllVisibleWindowsAsync(win, outputDir, overwrite);
                     capturedFiles.ForEach(Console.WriteLine);
                 }
             }
@@ -105,6 +109,14 @@ namespace UWPCaptureGraphicsWin2D
             {
                 Environment.Exit(0);
             }
+        }
+
+
+        private const string FLAG_NO_OVERWRITE = "--no-overwrite";
+
+        private static bool IsNoOverwriteFlag(string arg)
+        {
+            return string.Equals(arg, FLAG_NO_OVERWRITE, StringComparison.OrdinalIgnoreCase);
         }
 
 
@@ -159,6 +171,7 @@ namespace UWPCaptureGraphicsWin2D
 
             string outputDir = OutputFolderTextBox.Text;
             int countdownSeconds = (int)CountdownNumberBox.Value;
+            bool overwrite = OverwriteCheckBox.IsChecked == true;
 
             try
             {
@@ -184,7 +197,7 @@ namespace UWPCaptureGraphicsWin2D
                         try
                         {
                             // Grab the list of all successful captures
-                            var capturedFiles = await CaptureAllVisibleWindowsAsync(targetWindow, outputDir);
+                            var capturedFiles = await CaptureAllVisibleWindowsAsync(targetWindow, outputDir, overwrite);
 
                             DispatcherQueue.TryEnqueue(() =>
                             {
@@ -263,7 +276,7 @@ namespace UWPCaptureGraphicsWin2D
             WindowSelector.SelectedIndex = 0;
         }
 
-        private async Task<List<string>> CaptureAllVisibleWindowsAsync(string targetWindow, string outputDir)
+        private async Task<List<string>> CaptureAllVisibleWindowsAsync(string targetWindow, string outputDir, bool overwrite)
         {
             var windows = GetVisibleWindows();
             var capturedFiles = new List<string>();
@@ -282,8 +295,8 @@ namespace UWPCaptureGraphicsWin2D
                 string path = Path.Combine(outputDir, $"{name}.png");
                 FileInfo file = new FileInfo(path);
 
-                // generate new unique file name if a file already exists
-                for (int i = 2; capturedFiles.Contains(path); i++)
+                // generate a unique filename if the file already exists, unless overwrite is true
+                for (int i = 2; capturedFiles.Contains(path) || (!overwrite && File.Exists(path)); i++)
                 {
                     path = Path.Combine(outputDir, $"{name}-{i}.png");
                     file = new FileInfo(path);

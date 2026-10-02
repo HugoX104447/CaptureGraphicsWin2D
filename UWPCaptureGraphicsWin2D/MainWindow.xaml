@@ -20,6 +20,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Text="Output Folder:" FontWeight="SemiBold" />
                 <Grid Grid.Row="1" ColumnSpacing="8">
@@ -30,6 +31,7 @@
                     <TextBox x:Name="OutputFolderTextBox" Grid.Column="0" IsReadOnly="True" PlaceholderText="Select a folder..." HorizontalAlignment="Stretch" />
                     <Button x:Name="BrowseButton" Grid.Column="1" Content="Browse" Click="BrowseButton_Click"/>
                 </Grid>
+                <CheckBox x:Name="OverwriteCheckBox" Grid.Row="2" Content="Always overwrite existing files on disk" IsChecked="False" />
             </Grid>
 
             <Grid RowSpacing="8" ColumnSpacing="24">
