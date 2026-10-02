@@ -97,7 +97,7 @@ namespace UWPCaptureGraphicsWin2D
 
                 foreach (var win in targetWindow)
                 {
-                    var capturedFiles = await CaptureAllVisibleWindowsAsync(win, outputDir, overwrite);
+                    var capturedFiles = await CaptureAllVisibleWindowsAsync(win, outputDir, overwrite, CancellationToken.None);
                     capturedFiles.ForEach(Console.WriteLine);
                 }
             }
@@ -191,37 +191,31 @@ namespace UWPCaptureGraphicsWin2D
 
                     string targetWindow = WindowSelector.SelectedItem as String ?? SELECT_ALL_WINDOWS;
 
-                    // Offload actual capture to background to prevent DWM deadlock
-                    await Task.Run(async () =>
-                    {
-                        try
-                        {
-                            // Grab the list of all successful captures
-                            var capturedFiles = await CaptureAllVisibleWindowsAsync(targetWindow, outputDir, overwrite);
+                    // Offload actual capture and save to background to prevent DWM deadlock
+                    var capturedFiles = await Task.Run(() => CaptureAllVisibleWindowsAsync(targetWindow, outputDir, overwrite, token), token);
 
-                            DispatcherQueue.TryEnqueue(() =>
-                            {
-                                if (capturedFiles.Count > 0)
-                                {
-                                    StatusTextBlock.Text = "Status: Capture complete!";
-                                    OpenFolderAndSelectFiles(outputDir, capturedFiles);
-                                }
-                                else
-                                {
-                                    StatusTextBlock.Text = "Status: Nothing has been captured!";
-                                }
-                            });
-                        }
-                        catch (Exception e)
-                        {
-                            System.Diagnostics.Trace.WriteLine(e);
-                        }
-                    });
+                    // cancelled while the last window was being captured
+                    token.ThrowIfCancellationRequested();
+
+                    if (capturedFiles.Count > 0)
+                    {
+                        StatusTextBlock.Text = "Status: Capture complete!";
+                        OpenFolderAndSelectFiles(outputDir, capturedFiles);
+                    }
+                    else
+                    {
+                        StatusTextBlock.Text = "Status: Nothing has been captured!";
+                    }
                 }
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
                 StatusTextBlock.Text = "Status: Cancelled.";
+            }
+            catch (Exception e)
+            {
+                System.Diagnostics.Trace.WriteLine(e);
+                StatusTextBlock.Text = $"Status: Capture failed! {e.Message}";
             }
             finally
             {
@@ -276,13 +270,16 @@ namespace UWPCaptureGraphicsWin2D
             WindowSelector.SelectedIndex = 0;
         }
 
-        private async Task<List<string>> CaptureAllVisibleWindowsAsync(string targetWindow, string outputDir, bool overwrite)
+        private async Task<List<string>> CaptureAllVisibleWindowsAsync(string targetWindow, string outputDir, bool overwrite, CancellationToken token)
         {
             var windows = GetVisibleWindows();
             var capturedFiles = new List<string>();
 
             foreach (var win in windows)
             {
+                // stop between windows if the user cancelled (must stay outside the per-window try / catch below)
+                token.ThrowIfCancellationRequested();
+
                 string name = GetWindowName(win);
                 if (targetWindow != name && targetWindow != SELECT_ALL_WINDOWS)
                 {
