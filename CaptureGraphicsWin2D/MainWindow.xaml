@@ -50,7 +50,20 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <ComboBox x:Name="WindowSelector" Grid.Column="0" HorizontalAlignment="Stretch" DropDownOpened="WindowSelector_DropDownOpened" />
+                    <ComboBox x:Name="WindowSelector" Grid.Column="0" HorizontalAlignment="Stretch" DropDownOpened="WindowSelector_DropDownOpened">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="shared:WindowItem">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <!-- the window icon, or a glyph for "All Windows" and windows without an icon -->
+                                    <Grid Width="16" Height="16" VerticalAlignment="Center">
+                                        <Image Source="{x:Bind Icon}" Visibility="{x:Bind IconVisibility}" />
+                                        <FontIcon Glyph="{x:Bind Glyph}" FontSize="16" Visibility="{x:Bind GlyphVisibility}" />
+                                    </Grid>
+                                    <TextBlock Text="{x:Bind Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                     <shared:CrosshairWindowPicker x:Name="WindowPicker" Grid.Column="1" />
                 </Grid>
                 <TextBlock Text="Countdown:" Grid.Row="0" Grid.Column="1" FontWeight="SemiBold" />

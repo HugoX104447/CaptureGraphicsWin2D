@@ -307,8 +307,11 @@ namespace CaptureGraphicsWin2D
         // Fill the drop-down with all visible windows and select the given window (or "All Windows" if not found)
         private bool RefreshWindowSelector(IntPtr selectHwnd)
         {
+            var windows = GetVisibleWindows();
+            WindowIcons.Retain(windows.Select(w => w.Hwnd));
+
             var selection = new List<WindowItem> { ALL_WINDOWS_ITEM };
-            selection.AddRange(GetVisibleWindows().Select(w => new WindowItem(w.Hwnd, GetWindowName(w))).OrderBy(i => i.Name));
+            selection.AddRange(windows.Select(w => new WindowItem(w.Hwnd, GetWindowName(w)) { Icon = WindowIcons.Get(w.Hwnd) }).OrderBy(i => i.Name));
 
             int index = selection.FindIndex(i => i.Hwnd == selectHwnd);
 
