@@ -1,3 +1,4 @@
+using CaptureGraphicsWin2D.Shared;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.UI.Xaml;
@@ -55,8 +56,14 @@ namespace UWPCaptureGraphicsWin2D
             OutputFolderTextBox.Text = GetDefaultFolder();
 
             // Set default selected window
-            WindowSelector.ItemsSource = new List<string> { SELECT_ALL_WINDOWS };
+            WindowSelector.ItemsSource = new List<WindowItem> { ALL_WINDOWS_ITEM };
             WindowSelector.SelectedIndex = 0;
+
+            // Show the selected window in the status (subscribed after the initial selection to keep "Idle" on startup)
+            WindowSelector.SelectionChanged += WindowSelector_SelectionChanged;
+
+            // Select a window by dragging the crosshair onto it
+            WindowPicker.WindowPicked += WindowPicker_WindowPicked;
 
             // Ensure background tasks die when the window is closed
             this.Closed += (s, e) =>
@@ -97,7 +104,8 @@ namespace UWPCaptureGraphicsWin2D
 
                 foreach (var win in targetWindow)
                 {
-                    var capturedFiles = await CaptureAllVisibleWindowsAsync(win, outputDir, overwrite, CancellationToken.None);
+                    // the command line selects windows by name (title or class name)
+                    var capturedFiles = await CaptureAllVisibleWindowsAsync(w => win == SELECT_ALL_WINDOWS || win == GetWindowName(w), outputDir, overwrite, CancellationToken.None);
                     capturedFiles.ForEach(Console.WriteLine);
                 }
             }
@@ -189,10 +197,12 @@ namespace UWPCaptureGraphicsWin2D
                     StatusProgressRing.IsActive = true;
                     StatusProgressRing.Visibility = Visibility.Visible;
 
-                    string targetWindow = WindowSelector.SelectedItem as String ?? SELECT_ALL_WINDOWS;
+                    // the GUI selects exactly one window (by handle) or all windows
+                    var target = WindowSelector.SelectedItem as WindowItem ?? ALL_WINDOWS_ITEM;
+                    Func<WindowInfo, bool> isTarget = target.IsAllWindows ? (w => true) : (w => w.Hwnd == target.Hwnd);
 
                     // Offload actual capture and save to background to prevent DWM deadlock
-                    var capturedFiles = await Task.Run(() => CaptureAllVisibleWindowsAsync(targetWindow, outputDir, overwrite, token), token);
+                    var capturedFiles = await Task.Run(() => CaptureAllVisibleWindowsAsync(isTarget, outputDir, overwrite, token), token);
 
                     // cancelled while the last window was being captured
                     token.ThrowIfCancellationRequested();
@@ -246,6 +256,7 @@ namespace UWPCaptureGraphicsWin2D
             StopButton.IsEnabled = _isCapturing;
             CountdownNumberBox.IsEnabled = !_isCapturing;
             BrowseButton.IsEnabled = !_isCapturing;
+            WindowPicker.IsEnabled = !_isCapturing;
 
             if (!_isCapturing)
             {
@@ -256,6 +267,8 @@ namespace UWPCaptureGraphicsWin2D
 
         private const string SELECT_ALL_WINDOWS = "All Windows";
 
+        private static readonly WindowItem ALL_WINDOWS_ITEM = new WindowItem(IntPtr.Zero, SELECT_ALL_WINDOWS);
+
         private string GetWindowName(WindowInfo win)
         {
             return string.IsNullOrWhiteSpace(win.Title) ? win.ClassName : win.Title;
@@ -263,14 +276,48 @@ namespace UWPCaptureGraphicsWin2D
 
         private void WindowSelector_DropDownOpened(object sender, object evt)
         {
-            var selection = new List<string> { SELECT_ALL_WINDOWS };
-            selection.AddRange(GetVisibleWindows().Select(GetWindowName).Order().Distinct().ToList());
-
-            WindowSelector.ItemsSource = selection;
-            WindowSelector.SelectedIndex = 0;
+            // keep the current selection if that window still exists
+            var selected = WindowSelector.SelectedItem as WindowItem ?? ALL_WINDOWS_ITEM;
+            RefreshWindowSelector(selected.Hwnd);
         }
 
-        private async Task<List<string>> CaptureAllVisibleWindowsAsync(string targetWindow, string outputDir, bool overwrite, CancellationToken token)
+        private void WindowSelector_SelectionChanged(object sender, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs evt)
+        {
+            // don't overwrite the countdown / capture progress; the selection is null while the items are replaced
+            if (!_isCapturing && WindowSelector.SelectedItem is WindowItem selected)
+            {
+                StatusTextBlock.Text = $"Status: Selected \"{selected}\"";
+            }
+        }
+
+        private void WindowPicker_WindowPicked(object? sender, IntPtr hwnd)
+        {
+            var previous = WindowSelector.SelectedItem as WindowItem ?? ALL_WINDOWS_ITEM;
+
+            // on success the status is updated by WindowSelector_SelectionChanged
+            if (!RefreshWindowSelector(hwnd))
+            {
+                // keep what was selected before instead of falling back to "All Windows"
+                RefreshWindowSelector(previous.Hwnd);
+                StatusTextBlock.Text = "Status: This window can't be captured.";
+            }
+        }
+
+        // Fill the drop-down with all visible windows and select the given window (or "All Windows" if not found)
+        private bool RefreshWindowSelector(IntPtr selectHwnd)
+        {
+            var selection = new List<WindowItem> { ALL_WINDOWS_ITEM };
+            selection.AddRange(GetVisibleWindows().Select(w => new WindowItem(w.Hwnd, GetWindowName(w))).OrderBy(i => i.Name));
+
+            int index = selection.FindIndex(i => i.Hwnd == selectHwnd);
+
+            WindowSelector.ItemsSource = selection;
+            WindowSelector.SelectedIndex = Math.Max(index, 0);
+
+            return index >= 0;
+        }
+
+        private async Task<List<string>> CaptureAllVisibleWindowsAsync(Func<WindowInfo, bool> isTarget, string outputDir, bool overwrite, CancellationToken token)
         {
             var windows = GetVisibleWindows();
             var capturedFiles = new List<string>();
@@ -280,11 +327,12 @@ namespace UWPCaptureGraphicsWin2D
                 // stop between windows if the user cancelled (must stay outside the per-window try / catch below)
                 token.ThrowIfCancellationRequested();
 
-                string name = GetWindowName(win);
-                if (targetWindow != name && targetWindow != SELECT_ALL_WINDOWS)
+                if (!isTarget(win))
                 {
                     continue;
                 }
+
+                string name = GetWindowName(win);
 
                 // strip invalid characters
                 name = string.Join(" ", name.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries)).Trim();
